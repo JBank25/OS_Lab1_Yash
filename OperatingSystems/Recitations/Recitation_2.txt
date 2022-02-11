@@ -1,0 +1,40 @@
+Will still discuss implementation for Lab 1
+The files should be something like this
+    Parsing (.c)
+    fg/bd and job management (.c)
+    Signals/Jobs (.c)
+    Run action module (.c)
+
+Can compile all the .c files and then bring all the object files together
+afterwards. 
+
+Special Functions
+    pause()- This method can suspend a thread until a signal is received.
+    this is not something that is mandatory to build Lab 1. 
+
+System Calls to be aware of:
+    pause()
+    kill/killpg- send signals to process or process group. 
+    setpgid()- group proceses tgether for signaling, placing of fg/bg, and
+    other job control actions
+    tcsetprgp()- set terminal foreground process group
+    wait()/waitpid()- wait for a child process to stop or terminate. There are a
+    variety of options one can choose for waitpid(). WUNTRACED, WNOHANG,
+    WCONTINUED.  
+
+Signals that may be relevant:
+    SIGINT - interrupt from keyboard ^C
+    SIGTSTP- stop typed at terminal ^z
+    SIGCHLD- child stopped or terminated 
+    SIGTTIN- terminal input for background process
+    SIGTTOU- terminal output for background process
+
+implementation Tips:
+    1-1 correspondance between jobs and process groups
+    Pobably only needs 1 wait() call (hint->SIGNCHLD handler)
+    OSTEP ch 4 and 5 (processes and API) are important. Ch 14 (Mempry API)
+    is highly recommended.
+    WARNING when testing signals you must lunch program with ./yash
+
+
+

@@ -1,0 +1,1 @@
+int getPipeIndex(char ** inputs);

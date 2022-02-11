@@ -1,0 +1,25 @@
+We need to set up a virtual machine to let us run linux. PINTOS only
+runs on Linux. VirtualBox is probably best for me (MacOS)
+
+Tutorial for getting virtual machine provided by them. 
+
+Basic linux commabds:
+    ls, touch, vim, cat, rm, pwd
+
+
+What is an OS?
+    OS= resource manager that allows us to easily access/use resources on
+    the computer. Memory, file system, devices, etc. It is code between applicatoin
+    and hardware layers. Provides API to user programs in the form of system 
+    calls. 
+
+Shell = outermost layer of an OS. The user interface to the OS. Bash shell is
+default fo linux system. 
+
+
+
+File redirection is the first thing we need to implement for project.
+Seems farily straightforward upon review with TA's
+
+Piping is a way we can connect two applications in the OS. 
+
