@@ -19,14 +19,16 @@ typedef struct job {
     status_t status;//status of job stopped or running
     struct job * next;
 } job_t;
-job_t * jobList;//will be LL used to track all jobs
+
+job_t ** jobList;//will be LL used to track all jobs
 job_t * mostRecentJob;
 
 int shell;      
 pid_t shellPid;
 char ** parseInput(char * input);
-void createJob(char * parsedCommand);
+void createJob(char * command, job_t* newJob);
 void printJobs();
+void setJobList(job_t * newJob);
 
 int main(int argc, char** argv)
 {
@@ -40,27 +42,24 @@ int main(int argc, char** argv)
 
     shellPid = getpid();//we'll initially get the process ID of our shell
     setpgid(shellPid,shellPid);//set the group ID of the shell
-    job_t *headJob = malloc(sizeof(job_t));
-    mostRecentJob = headJob;
-    jobList = &headJob;
-    headJob->pgid = shellPid;
-    headJob->status = RUNNING;
-    strcpy(headJob->jobStr, "SHELL");
-
+    job_t* firstJob = (job_t*)malloc(sizeof(job_t));
+    strcpy(firstJob->jobStr , "shell");
+    firstJob->status = RUNNING;
+    firstJob->next = NULL;
+    jobList = &firstJob;
     printf("Shell ID: %d Shell Group ID: %d\n",shellPid,getpgid(shellPid));
     while(cmd = readline("# "))
     {
-        printf("Most recent Job: %s\n", mostRecentJob->jobStr);
-        char inputHold[MAX_CHARS];
-        strcpy(inputHold, cmd);
-        parsedCommand = parseInput(cmd);//parse commands
-        createJob(inputHold);
-        pipeIndex = getPipeIndex(parsedCommand);//get index of the pipe if one exists
+        job_t *newJob = (job_t*) malloc(sizeof(job_t));
+        createJob(cmd, newJob);
+        setJobList(newJob);
         cpid = fork();
         if(cpid ==0)
         {
+            printf("Forking\n");
             printJobs();
-            redirectionReturnCheck = 0;//redirectionCheck(parsedCommand);//see if any redirection commands exist
+            exit(1);
+            /*redirectionReturnCheck = 0;//redirectionCheck(parsedCommand);//see if any redirection commands exist
             if(redirectionReturnCheck)
             {
                 if(pipeIndex==0)
@@ -75,40 +74,52 @@ int main(int argc, char** argv)
                 }
             }
             else
-                execvp(parsedCommand[0], parsedCommand);
+                execvp(parsedCommand[0], parsedCommand);*/
         }
-        else
-        {
-            wait((int*) NULL);
-        }
+        wait((int*) NULL);
     }
+
     free(parsedCommand);
     free(redirectCommands);
-    free(headJob);
+    free(jobList);
+    free(mostRecentJob);
 }
 
 void printJobs()
 {
-    job_t *headJob = jobList;
-    while(jobList != NULL)
+    job_t **headJob = (job_t**) malloc(sizeof(job_t*));
+    headJob = jobList;
+    while(*jobList != NULL)
     {
-        printf("Job: %s Status: %d\n", jobList->jobStr, jobList->status);
-        jobList = jobList->next;
+        printf("Job: %s Status: %d Next: %p\n", (*jobList)->jobStr, (*jobList)->status, (*jobList)->next);
+        *jobList = (*jobList)->next;
     }
     jobList = headJob;
 }
-
-void createJob(char * command)
+void setJobList(job_t * newJob)
 {
-    printf("Create Job for : %s\n", command);
-    job_t *newJob = (job_t*) malloc(sizeof(job_t));
+    printf("Setting job list for: %s address: %p\n", newJob->jobStr, newJob);
+    job_t** jobHold = (job_t**) malloc(sizeof(job_t*));
+    job_t* jobHold2 = (job_t*) malloc(sizeof(job_t));//had to add this line
+    jobHold2 = *jobList;
+    printf("Current Head: %s\n",(*jobList)->jobStr);
+    jobHold = jobList;
+    while((*jobList)->next != NULL)
+    {
+        printf("%s\n",(*jobList)->jobStr);
+        (*jobList) = (*jobList)->next;
+    }
+    (*jobList)->next = newJob;
+    jobList = jobHold;
+    *jobList = jobHold2;//and this line to prevent ptr from only holding 2 values
+    printf("New Head: %s\n",(*jobList)->jobStr);
+}
+void createJob(char * command, job_t * newJob)
+{
+    printf("Creating job for: %s\n", command);
     strcpy(newJob->jobStr, command);
     newJob->status = STOPPED;
-    mostRecentJob->next = &newJob;
-    mostRecentJob = &newJob;
-    mostRecentJob->next = NULL;
-    printf("New Job: %s Job status: %d\n", newJob->jobStr, newJob->status);
-    printf("sucess\n");
+    newJob->next = NULL;
 }
 char ** parseInput(char * input)
 {
