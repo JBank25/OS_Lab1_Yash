@@ -39,6 +39,7 @@
 //not being NULL inside of the if statements
 int redirectionCheck(char** commands)
 {
+    printf("*************************In redirection check*************************\n");
     char *redirectSymbol0 = "<";
     char *redirectSymbol1 =  ">";
     char *redirectSymbol2 =  "2>";
@@ -47,6 +48,7 @@ int redirectionCheck(char** commands)
     int redirectCheck0, redirectCheck1, redirectCheck2;
     while(commands[counter] != NULL)
     {
+        printf("Input Check: %s\n", commands[counter]);
         redirectCheck0 = strcmp(redirectSymbol0, commands[counter]) == 0;
         redirectCheck1 = strcmp(redirectSymbol1, commands[counter]) == 0;
         redirectCheck2 = strcmp(redirectSymbol2, commands[counter]) == 0;
@@ -60,7 +62,6 @@ int redirectionCheck(char** commands)
     return NO_REDIRECTION;
 }
 
-//NEED TO SEARCH PATH TO ESNURE ALL THE FILES THAT NEED TO EXIST DO EXIST
 int setRedirection(char **redirectArgs)
 {
     pid_t cpid;
@@ -88,7 +89,7 @@ int setRedirection(char **redirectArgs)
             {
                 case STDIN :
                     sizeCounter = 1;
-                    printf("Redirect stdin\n");
+                    printf("********Redirect stdin********\n");
                     //commands = (char**) realloc(commands, sizeof(char*) * sizeCounter);
                     //commands[counter+1] = redirectArgs[counter];
                     RESET_FLAGS(stderrCheck, stdinCheck, stdCheck,stdoutCheck);//sets all back to 0
@@ -96,10 +97,20 @@ int setRedirection(char **redirectArgs)
                     if(inputRedirectionFile == FAIL_FILE_NOT_FOUND)
                         return FAIL_FILE_NOT_FOUND;
                     printf("Success in redirect\n");
-                    dup2(inputRedirectionFile, REPLACE_STDIN);
-                    execvp(commands[0], commands);
-                    printf("returned from exec\n");
-                    //break;
+                    printf("Result of exec below:\n");
+                    cpid = fork();
+                    if(cpid == 0)
+                    {
+                        dup2(inputRedirectionFile, REPLACE_STDIN);
+                        printf("\n\n\n");
+                        execvp(commands[0], commands);
+                        exit(1);
+                    }
+                    else
+                    {
+                        wait((int*) NULL);
+                    }
+                    break;
                 case STDOUT :
                     printf("Redirect stdout\n");
                     //commands = (char**) realloc(commands, sizeof(char*) * sizeCounter);
@@ -114,11 +125,20 @@ int setRedirection(char **redirectArgs)
                         i++;
                     }
                     printf("File to redirect to: %s \n", redirectArgs[counter+1]);
-                    dup2(outputRedirectionFile, REPLACE_STDOUT);
-                    execvp(commands[0], commands);
+                    cpid = fork();
+                    if(cpid == 0)
+                    {
+                        dup2(outputRedirectionFile, REPLACE_STDOUT);
+                        execvp(commands[0], commands);
+                        exit(1);
+                    }
+                    else
+                    {
+                        wait((int*) NULL);
+                    }
                     break; 
                 case(STDERR):  
-                    printf("Redirect stderr\n");
+                    printf("**********Redirect stderr(**********\n");
                     commands = (char**) realloc(commands, sizeof(char*) * sizeCounter);
                     commands[counter+1] = redirectArgs[counter];
                     sizeCounter = 1;
@@ -138,4 +158,4 @@ int setRedirection(char **redirectArgs)
         counter++;
     }     
     return 1;
-}
+} 

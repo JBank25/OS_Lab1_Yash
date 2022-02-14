@@ -29,7 +29,7 @@ char ** parseInput(char * input);
 void createJob(char * command, job_t* newJob);
 void printJobs();
 void setJobList(job_t * newJob);
-
+void setChildren(char** leftChild, char** rightChild, int pipeIndex, char** parsedCommand);
 int main(int argc, char** argv)
 {
     int scaler = sizeof(char*);
@@ -40,29 +40,17 @@ int main(int argc, char** argv)
     int redirectionReturnCheck;
     int pipeIndex = 0;
 
-    shellPid = getpid();//we'll initially get the process ID of our shell
-    setpgid(shellPid,shellPid);//set the group ID of the shell
-    job_t* firstJob = (job_t*)malloc(sizeof(job_t));
-    strcpy(firstJob->jobStr , "shell");
-    firstJob->status = RUNNING;
-    firstJob->next = NULL;
-    jobList = &firstJob;
-    printf("Shell ID: %d Shell Group ID: %d\n",shellPid,getpgid(shellPid));
     while(cmd = readline("# "))
     {
-        job_t *newJob = (job_t*) malloc(sizeof(job_t));
-        createJob(cmd, newJob);
-        setJobList(newJob);
+        parsedCommand = parseInput(cmd);//parse commands
+        pipeIndex = getPipeIndex(parsedCommand);//get index of the pipe if one exists
         cpid = fork();
         if(cpid ==0)
         {
-            printf("Forking\n");
-            printJobs();
-            exit(1);
-            /*redirectionReturnCheck = 0;//redirectionCheck(parsedCommand);//see if any redirection commands exist
+            redirectionReturnCheck = redirectionCheck(parsedCommand);//see if any redirection commands exist
             if(redirectionReturnCheck)
             {
-                if(pipeIndex==0)
+                if(pipeIndex==-1)
                     setRedirection(parsedCommand);
                 else
                 {
@@ -73,16 +61,39 @@ int main(int argc, char** argv)
                     setRedirection(commandsAfterPipe);
                 }
             }
+            else if(pipeIndex!=-1)
+            {
+                printf("No redirection\n");
+                char ** commandsAfterPipe = &(parsedCommand[pipeIndex+1]);
+                char ** commandsBeforePipe = &(parsedCommand[0]);
+                commandsBeforePipe[pipeIndex] = NULL;
+                /*int i = 0;
+                printf("\n\n\n");
+                printf("Commands before pipe:\n");
+                while(commandsBeforePipe[i] != NULL)
+                {
+                    printf(" %s ", commandsBeforePipe[i]);
+                    i++;
+                }
+                i = 0;
+                printf("Commands after pips:\n");
+                while(commandsAfterPipe[i] != NULL)
+                {
+                    printf(" %s ", commandsAfterPipe[i]);
+                    i++;
+                }        */        
+                yashPipe(commandsBeforePipe, commandsAfterPipe);
+            }
             else
-                execvp(parsedCommand[0], parsedCommand);*/
+                execvp(parsedCommand[0], parsedCommand);
         }
-        wait((int*) NULL);
+        else
+        {
+            wait((int*) NULL);
+        }
     }
-
     free(parsedCommand);
     free(redirectCommands);
-    free(jobList);
-    free(mostRecentJob);
 }
 
 void printJobs()
@@ -91,7 +102,7 @@ void printJobs()
     headJob = jobList;
     while(*jobList != NULL)
     {
-        printf("Job: %s Status: %d Next: %p\n", (*jobList)->jobStr, (*jobList)->status, (*jobList)->next);
+        printf("Job: %s Status: %d Next: %p PGID: %d\n", (*jobList)->jobStr, (*jobList)->status, (*jobList)->next, (*jobList)->pgid);
         *jobList = (*jobList)->next;
     }
     jobList = headJob;
@@ -117,9 +128,74 @@ void setJobList(job_t * newJob)
 void createJob(char * command, job_t * newJob)
 {
     printf("Creating job for: %s\n", command);
+    newJob->pgid = getpid();
     strcpy(newJob->jobStr, command);
     newJob->status = STOPPED;
     newJob->next = NULL;
+}
+
+void setChildren(char** leftChild, char** rightChild, int pipeIndex, char** parsedCommand)
+{
+    printf("Setting children\n");
+    int scaler = sizeof(char*);
+    if(pipeIndex == -1)
+    {
+        printf("Setting values for left child\n");
+        int i = 0;
+        while(parsedCommand[i] != NULL)
+        {
+            leftChild = (char**) realloc(leftChild,scaler * (i+1));
+            leftChild[i] = parsedCommand[i];
+            i++;
+        }
+        i = 0;
+        printf("Left Child: ");
+        while(leftChild[i] != NULL)
+        {
+            printf("%s ", leftChild[i]);
+            i++;
+        }
+        rightChild[0] = NULL;
+        if(rightChild == NULL)
+            printf("Right cHild: %s", rightChild[0]);
+        return;
+    }
+    int i = 0;
+    while(strcmp(parsedCommand[i], "|\0") != 0)
+    {
+        leftChild = (char**) realloc(leftChild,scaler * (i+1));
+        leftChild[i] = parsedCommand[i];
+        printf("parsed COmmand: %s child value: %s\n", leftChild[i], parsedCommand[i]);
+        i++;
+    }
+    i++;
+    int counter = 1;
+    leftChild = (char**) realloc(leftChild,scaler * (i+1));
+    leftChild[i] = NULL;
+    while(parsedCommand[i] != NULL)
+    {
+        rightChild = (char**) realloc(rightChild,scaler * (counter));
+        rightChild[counter-1] = parsedCommand[i];
+        printf("parsed COmmand: %s child value: %s\n", rightChild[i], parsedCommand[i]);
+        counter++;
+        i++;
+    }
+    i = 0;
+    printf("Left Child: ");
+    while(leftChild[i] != NULL)
+    {
+        printf("%s ", leftChild[i]);
+        i++;
+    }
+    i = 0;
+    printf("\nRight Child: ");
+    while(rightChild[i] != NULL)
+    {
+        printf("%s ", rightChild[i]);
+        i++;
+    }
+    printf("\n");
+    return;
 }
 char ** parseInput(char * input)
 {
