@@ -8,53 +8,48 @@
 #include <sys/wait.h>
 #include "file_redirection.h"
 #include "pipe.h"
+#include "jobs.h"
 
 #define MAX_CHARS 2000
 #define MAX_TOKENS 30
 
-
 char ** parseInput(char * input);
-
+void createJob(char * command, job_t * newJob, int cpid);
+void initializeSignals();
+void printJobs();
+void setJobList(char * command, int cpid);
+void setChildren(char** leftChild, char** rightChild, int pipeIndex, char** parsedCommand);
 int main(int argc, char** argv)
 {
     int scaler = sizeof(char*);
-    pid_t cpid;
     char * cmd;
     char ** parsedCommand;
-    char ** redirectCommands = (char**)malloc(scaler*3);
-    int redirectionReturnCheck;
-    int pipeIndex = 0;
-     
-    while(cmd = readline("# "))
+    int shellPid = getpid();
+    setpgid(0, shellPid);
+    tcsetpgrp (STDIN_FILENO, shellPid);
+    printf("Shell PID %d Shell pgid: %d\n", shellPid, getpgid(shellPid));
+
+    initializeSignals();
+    initializeJobList();
+    printf("Initial pid: %d\n", getpid());
+    cmd = readline("# ");
+    while(cmd)
     {
+        int status;
         parsedCommand = parseInput(cmd);//parse commands
-        pipeIndex = getPipeIndex(parsedCommand);//get index of the pipe if one exists
-        cpid = fork();
-        if(cpid ==0)
-        {
-            redirectionReturnCheck = redirectionCheck(parsedCommand);//see if any redirection commands exist
-            if(redirectionReturnCheck)
-            {
-                if(pipeIndex==0)
-                    setRedirection(parsedCommand);
-                else
-                {
-                    char ** commandsAfterPipe = &redirectCommands[pipeIndex];
-                    char ** commandsBeforePipe = parsedCommand;
-                    commandsAfterPipe[pipeIndex] = NULL;
-                    setRedirection(commandsBeforePipe);
-                    setRedirection(commandsAfterPipe);
-                }
-            }
-            execvp(parsedCommand[0], parsedCommand);
-        }
-        else
-        {
-            wait((int*) NULL);
-        }
+        handleCommand(parsedCommand);
+        cmd = readline("# ");
     }
     free(parsedCommand);
-    free(redirectCommands);
+}
+
+void initializeSignals()
+{
+    signal(SIGTSTP, SIG_IGN);
+    signal(SIGINT, SIG_IGN);
+    signal(SIGTTOU, SIG_IGN);
+    signal(SIGTTIN, SIG_IGN);
+    return;
 }
 
 char ** parseInput(char * input)

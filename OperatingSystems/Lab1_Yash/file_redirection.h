@@ -1,2 +1,5 @@
+#ifndef FILE_REDIRECTION_H
+#define FILE_REDIRECTION_H
 int redirectionCheck(char** commands);
-int setRedirection(char **redirectArgs);
+void handleRedirection(char **redirectArgs);
+#endif

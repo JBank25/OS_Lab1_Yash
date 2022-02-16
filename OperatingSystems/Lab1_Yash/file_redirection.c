@@ -22,6 +22,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include "jobs.h"
 
 #define REDIRECTION_FOUND 1
 #define REPLACE_STDIN 0
@@ -42,9 +43,9 @@ int redirectionCheck(char** commands)
     char *redirectSymbol0 = "<";
     char *redirectSymbol1 =  ">";
     char *redirectSymbol2 =  "2>";
-
     int counter = 0;
     int redirectCheck0, redirectCheck1, redirectCheck2;
+
     while(commands[counter] != NULL)
     {
         redirectCheck0 = strcmp(redirectSymbol0, commands[counter]) == 0;
@@ -52,7 +53,6 @@ int redirectionCheck(char** commands)
         redirectCheck2 = strcmp(redirectSymbol2, commands[counter]) == 0;
         if(redirectCheck0 || redirectCheck1 || redirectCheck2)
         {
-            printf("REIRECTION FOUUND!\n");
             return REDIRECTION_FOUND;
         }
         counter+=1;
@@ -60,82 +60,59 @@ int redirectionCheck(char** commands)
     return NO_REDIRECTION;
 }
 
-//NEED TO SEARCH PATH TO ESNURE ALL THE FILES THAT NEED TO EXIST DO EXIST
-int setRedirection(char **redirectArgs)
+void handleRedirection(char **redirectArgs)
 {
-    pid_t cpid;
     int scaler = sizeof(char*);
     char** commands = malloc(scaler);
+    *commands = NULL;
     char * replaceStdin = "<";
     char * replaceStdout = ">";
     char * replaceStderr = "2>";
     int stdinCheck, stderrCheck, stdoutCheck, stdCheck;
     int inputRedirectionFile, outputRedirectionFile;
     int counter = 0, sizeCounter = 1;
+    int additionalCommands = 1;
     while(redirectArgs[counter] != NULL)
     {
-        printf("Current Arg: %s\n", redirectArgs[counter]);
         stdinCheck = (strcmp(redirectArgs[counter], replaceStdin) == 0);
         stdoutCheck = (strcmp(redirectArgs[counter], replaceStdout) == 0) << 1;
         stderrCheck = (strcmp(redirectArgs[counter], replaceStderr) == 0) << 2;
-        printf("Stdin checks: %d %d %d\n", stdinCheck, stdoutCheck, stderrCheck);
         stdCheck = stderrCheck | stdinCheck | stdoutCheck;
-        printf("Stdcheck value: %d\n", stdCheck);
-        printf("OR'd Value: %d\n", stderrCheck || stdinCheck || stdoutCheck);
-        if(stderrCheck || stdinCheck || stdoutCheck)
+        switch(stdCheck)
         {
-            switch(stdCheck)
+            if(stdCheck == stdinCheck)
             {
-                case STDIN :
-                    sizeCounter = 1;
-                    printf("Redirect stdin\n");
-                    //commands = (char**) realloc(commands, sizeof(char*) * sizeCounter);
-                    //commands[counter+1] = redirectArgs[counter];
-                    RESET_FLAGS(stderrCheck, stdinCheck, stdCheck,stdoutCheck);//sets all back to 0
-                    inputRedirectionFile = open(redirectArgs[counter+1], O_RDONLY);
-                    if(inputRedirectionFile == FAIL_FILE_NOT_FOUND)
-                        return FAIL_FILE_NOT_FOUND;
-                    printf("Success in redirect\n");
-                    dup2(inputRedirectionFile, REPLACE_STDIN);
-                    execvp(commands[0], commands);
-                    printf("returned from exec\n");
-                    //break;
-                case STDOUT :
-                    printf("Redirect stdout\n");
-                    //commands = (char**) realloc(commands, sizeof(char*) * sizeCounter);
-                    //commands[counter+1] = redirectArgs[counter];
-                    sizeCounter = 1;
-                    RESET_FLAGS(stderrCheck, stdinCheck, stdCheck,stdoutCheck);                   
-                    outputRedirectionFile = open(redirectArgs[counter+1], O_WRONLY | O_CREAT | O_TRUNC, (S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH));
-                    int i = 0;
-                    while(commands[i] != NULL)
-                    {
-                        printf("%s\n",commands[i]);
-                        i++;
-                    }
-                    printf("File to redirect to: %s \n", redirectArgs[counter+1]);
-                    dup2(outputRedirectionFile, REPLACE_STDOUT);
-                    execvp(commands[0], commands);
-                    break; 
-                case(STDERR):  
-                    printf("Redirect stderr\n");
+                printf("Stdin Check\n");
+                additionalCommands = 0;
+                inputRedirectionFile = open(redirectArgs[counter+1], O_RDONLY);
+                if(inputRedirectionFile == FAIL_FILE_NOT_FOUND)
+                    return;
+                dup2(inputRedirectionFile, STDIN_FILENO);
+            }
+            else if(stdCheck == stdoutCheck)
+            {
+                printf("Stdout Check\n");
+                additionalCommands = 0;
+                outputRedirectionFile = open(redirectArgs[counter+1], O_WRONLY | O_CREAT | O_TRUNC, (S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH));
+                dup2(outputRedirectionFile, STDOUT_FILENO);
+            }
+            else if(stdCheck == stderrCheck)
+            {
+                printf("Stderr Check\n");
+                additionalCommands = 0;
+                outputRedirectionFile = open(redirectArgs[counter+1], O_WRONLY | O_CREAT | O_TRUNC, (S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH));          
+                dup2(outputRedirectionFile, STDERR_FILENO);
+            }
+            else
+            {
+                if(additionalCommands)
+                {
                     commands = (char**) realloc(commands, sizeof(char*) * sizeCounter);
-                    commands[counter+1] = redirectArgs[counter];
-                    sizeCounter = 1;
-                    RESET_FLAGS(stderrCheck, stdinCheck, stdCheck,stdoutCheck);
-                    outputRedirectionFile = open(redirectArgs[counter+1], O_WRONLY | O_CREAT | O_TRUNC, (S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH));          
-                    dup2(outputRedirectionFile, REPLACE_STDOUT);
-                    execvp(commands[0], commands);
-                    break;     
+                    commands[counter] = redirectArgs[counter];
+                }            
             }
         }
-        else
-        {
-            commands = (char**) realloc(commands, (scaler * sizeCounter));
-            commands[counter] = redirectArgs[counter];
-            sizeCounter+=1;
-        }
         counter++;
-    }     
-    return 1;
+    }
+    execvp(commands[0], commands);     
 }
